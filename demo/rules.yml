@@ -1,0 +1,10 @@
+groups:
+  - name: local-demo
+    rules:
+      - alert: DemoTargetUnavailable
+        expr: probe_success{job="blackbox"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Local demo target failed its HTTP probe
