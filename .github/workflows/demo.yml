@@ -72,5 +72,22 @@ jobs:
           else:
               raise SystemExit('Probe did not recover')
           PY
+      - name: Verify synthetic log ingestion and retrieval
+        run: python3 emit_demo_log.py
+      - name: Verify provisioned dashboard and Loki datasource
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, urllib.request
+          auth=base64.b64encode(("admin:"+os.environ["GRAFANA_ADMIN_PASSWORD"]).encode()).decode()
+          def get(path):
+              req=urllib.request.Request("http://127.0.0.1:3000"+path,headers={"Authorization":"Basic "+auth})
+              with urllib.request.urlopen(req,timeout=5) as r:
+                  return json.load(r)
+          dash=get("/api/dashboards/uid/potato-local-demo")["dashboard"]
+          assert len(dash["panels"])==4
+          assert get("/api/datasources/uid/demo-loki")["type"]=="loki"
+          assert get("/api/datasources/uid/demo-prometheus")["type"]=="prometheus"
+          print("Dashboard and both datasources verified")
+          PY
       - if: always()
         run: docker compose -p potato-metrics-demo down -v

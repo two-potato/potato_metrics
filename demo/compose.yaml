@@ -27,6 +27,8 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/demo.yml:ro
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/demo.yml:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
       - grafana-demo:/var/lib/grafana
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.27.0
@@ -34,8 +36,18 @@ services:
       - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
     command:
       - --config.file=/etc/blackbox_exporter/config.yml
+  loki:
+    image: grafana/loki:3.5.0
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki.yml:/etc/loki/local-config.yaml:ro
+      - loki-demo:/loki
+    ports:
+      - "127.0.0.1:3100:3100"
   demo-target:
     image: nginx:1.28-alpine
 volumes:
   prometheus-demo:
   grafana-demo:
+  loki-demo:
