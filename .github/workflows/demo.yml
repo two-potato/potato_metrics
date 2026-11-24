@@ -39,6 +39,27 @@ jobs:
           else:
               raise SystemExit('No healthy probe')
           PY
+      - name: Verify dashboard provisioning and datasource
+        run: |
+          python3 - <<'PY'
+          import base64, json, os, time, urllib.request
+          auth = base64.b64encode(('admin:'+os.environ['GRAFANA_ADMIN_PASSWORD']).encode()).decode()
+          def get(path):
+              request = urllib.request.Request('http://127.0.0.1:3000'+path,headers={'Authorization':'Basic '+auth})
+              return json.load(urllib.request.urlopen(request,timeout=4))
+          for _ in range(30):
+              try:
+                  dashboard=get('/api/dashboards/uid/potato-demo')['dashboard']
+                  datasource=get('/api/datasources/uid/prometheus-demo')
+                  assert len(dashboard['panels'])==5
+                  assert datasource['type']=='prometheus'
+                  assert all(p['datasource']['uid']=='prometheus-demo' for p in dashboard['panels'])
+                  break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit('Provisioning failed')
+          PY
       - name: Verify alert fires when demo target stops
         run: |
           docker compose -p potato-metrics-demo stop demo-target

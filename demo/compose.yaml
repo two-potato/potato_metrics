@@ -27,6 +27,8 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:
       - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/demo.yml:ro
+      - ./grafana-dashboard-provider.yml:/etc/grafana/provisioning/dashboards/demo.yml:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
       - grafana-demo:/var/lib/grafana
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.27.0
