@@ -31,4 +31,8 @@ docker compose -p potato-metrics-demo down
 unset GRAFANA_ADMIN_PASSWORD
 ```
 
-The lab has no external notification receiver, real SLA, production hardening claim or log pipeline. The commands above are expected behavior, not measured results until CI or a local run confirms them. The root stack is historical and not a safe default; do not run it as part of this lab.
+The lab has no external notification receiver, real SLA, production hardening claim or production log collector. The commands above are expected behavior, not measured results until CI or a local run confirms them. The root stack is historical and not a safe default; do not run it as part of this lab.
+
+## Dashboard and synthetic logs
+
+Open the provisioned **Potato Metrics | Local lab** dashboard in Grafana. It displays HTTP probe state, duration, firing alerts, and synthetic logs. Run `python3 emit_demo_log.py` from `demo/` to send a generated event to local Loki and verify retrieval. The exercise deliberately uses no host logs, Docker socket, customer data or external telemetry. This is a local ingestion example, not a production log collection agent.
