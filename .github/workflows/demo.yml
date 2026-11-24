@@ -1,0 +1,76 @@
+name: Local observability validation
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: demo
+    env:
+      GRAFANA_ADMIN_PASSWORD: disposable-ci-demo-only
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -p potato-metrics-demo config --quiet
+      - run: |
+          docker compose -p potato-metrics-demo run --rm --no-deps --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yml
+          docker compose -p potato-metrics-demo run --rm --no-deps --entrypoint /bin/amtool alertmanager check-config /etc/alertmanager/alertmanager.yml
+      - run: docker compose -p potato-metrics-demo up -d
+      - name: Healthy probe and provisioned Grafana
+        run: |
+          python3 - <<'PY'
+          import json, time, urllib.request, urllib.parse
+          def query(expr):
+              url = 'http://127.0.0.1:9090/api/v1/query?' + urllib.parse.urlencode({'query':expr})
+              return json.load(urllib.request.urlopen(url,timeout=4))['data']['result']
+          for _ in range(45):
+              try:
+                  data=query('probe_success{job="blackbox"}')
+                  if data and data[0]['value'][1]=='1':
+                      urllib.request.urlopen('http://127.0.0.1:3000/api/health',timeout=4)
+                      break
+              except Exception:
+                  pass
+              time.sleep(3)
+          else:
+              raise SystemExit('No healthy probe')
+          PY
+      - name: Verify alert fires when demo target stops
+        run: |
+          docker compose -p potato-metrics-demo stop demo-target
+          python3 - <<'PY'
+          import json, time, urllib.request
+          for _ in range(40):
+              try:
+                  alerts=json.load(urllib.request.urlopen('http://127.0.0.1:9093/api/v2/alerts',timeout=4))
+                  if any(a['labels'].get('alertname')=='DemoTargetUnavailable' for a in alerts):
+                      break
+              except Exception:
+                  pass
+              time.sleep(3)
+          else:
+              raise SystemExit('Alert did not fire')
+          PY
+      - name: Verify probe recovery
+        run: |
+          docker compose -p potato-metrics-demo start demo-target
+          python3 - <<'PY'
+          import json, time, urllib.request, urllib.parse
+          url='http://127.0.0.1:9090/api/v1/query?'+urllib.parse.urlencode({'query':'probe_success{job="blackbox"}'})
+          for _ in range(30):
+              try:
+                  data=json.load(urllib.request.urlopen(url,timeout=4))['data']['result']
+                  if data and data[0]['value'][1]=='1':
+                      break
+              except Exception:
+                  pass
+              time.sleep(3)
+          else:
+              raise SystemExit('Probe did not recover')
+          PY
+      - if: always()
+        run: docker compose -p potato-metrics-demo down -v
